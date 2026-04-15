@@ -1,0 +1,7 @@
+package com.EastCloud.smart_cs.repository;
+
+import com.EastCloud.smart_cs.entity.MessageEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface MessageRepository extends JpaRepository<MessageEntity, Long> {
+}

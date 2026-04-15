@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent F - 亚马逊智能客服 工作台</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="hub-icon">✦</span> Agent F <span class="badge pro">PRO</span>
+            </div>
+            
+            <div class="stats-overview">
+                <div class="stat-item">
+                    <span class="stat-value">12.4h</span>
+                    <span class="stat-label">今日为您节省</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">98.2%</span>
+                    <span class="stat-label">AI 采纳率</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#" class="active">📫 收件箱 (1)</a>
+                <a href="#">📋 待办风控单</a>
+                <a href="#">⚙️ 自动策略集</a>
+                <a href="#">📊 数据大屏</a>
+            </nav>
+            
+            <div class="demo-actions">
+                <button id="btnMockMessage" class="btn-primary mock-btn">
+                    <span>⚡ 模拟接收亚马逊 SP-API 消息</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <header class="workspace-header">
+                <div class="header-titles">
+                    <h2>订单流转中心 - 智能处理管道</h2>
+                    <span class="pipeline-status">当前队列: 空闲</span>
+                </div>
+                
+            </header>
+
+            <div class="chat-container box-glass">
+                <div id="orderContextBar" class="order-context-bar" style="display: none;">
+                    <div class="product-thumb"></div>
+                    <div class="order-details">
+                        <strong id="currentOrderInfo"></strong>
+                        <span class="product-name">Bose QuietComfort 45 蓝牙消噪耳机 - 黑色 (ASIN: B098FH5P3C)</span>
+                    </div>
+                    <div class="order-tags">
+                        <span class="badge blue">Prime 配送</span>
+                        <span class="badge gray">已签收 (3天前)</span>
+                    </div>
+                </div>
+
+                <div id="chatHistory" class="chat-history">
+                    <div class="placeholder-msg">工作台等待接入新客诉...</div>
+                </div>
+            </div>
+
+            <!-- AI 流程可视化 -->
+            <div id="aiPipeline" class="ai-pipeline" style="display: none;">
+                <div class="step step-1"><span class="step-icon">🧠</span> 情感意图分析...</div>
+                <div class="step step-2"><span class="step-icon">📚</span> RAG 知识检索...</div>
+                <div class="step step-3"><span class="step-icon">✍️</span> 大模型草稿撰写...</div>
+                <div class="step step-4"><span class="step-icon">🛡️</span> 合规词库扫描...</div>
+            </div>
+
+            <div class="reply-box box-glass" id="replyBox" style="display: none;">
+                <div class="reply-header">
+                    <div class="ai-insight-tags">
+                        <span class="badge red">💢 愤怒客户 (高危)</span>
+                        <span class="badge purple">分析意图: <span id="replyIntent"></span></span>
+                        <span class="badge green">✔️ 平台合规检测: 通过 (0风险词)</span>
+                    </div>
+                    <div class="confidence">AI 置信度: <span>99.2%</span></div>
+                </div>
+                <textarea id="aiDraftInput" rows="5"></textarea>
+                <div class="reply-actions">
+                    <button class="btn-secondary">⚙️ 重写风格 (更强硬)</button>
+                    <button id="btnSendReply" class="btn-primary">发送并完结 SP-API (自动擦除 PII)</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel (RAG) -->
+        <aside class="right-panel">
+            <h3>📖 企业私域知识引擎</h3>
+            
+            <div class="search-box">
+                <input type="text" placeholder="检索知识库..." />
+            </div>
+
+            <div class="kb-section">
+                <h4>已启用的核心知识集</h4>
+                <ul class="kb-list pre-populated">
+                    <li>
+                        <div class="kb-icon">📑</div>
+                        <div class="kb-info">
+                            <strong>Global_Return_Policy_v2.pdf</strong>
+                            <span>30.2 MB · 向量化完成 (1,024 Chunks)</span>
+                        </div>
+                        <span class="status-dot green"></span>
+                    </li>
+                    <li>
+                        <div class="kb-icon">📘</div>
+                        <div class="kb-info">
+                            <strong>Bose_Troubleshooting.docx</strong>
+                            <span>2.1 MB · 向量化完成 (312 Chunks)</span>
+                        </div>
+                        <span class="status-dot green"></span>
+                    </li>
+                    <li>
+                        <div class="kb-icon">📋</div>
+                        <div class="kb-info">
+                            <strong>话术与合规红线词典.csv</strong>
+                            <span>150 KB · 热加载生效中</span>
+                        </div>
+                        <span class="status-dot green"></span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="upload-area">
+                <p>拖拽新的 PDF/Word 文件注入 AI<br/><small>(支持自动 OCR 视觉解析)</small></p>
+                <input type="file" id="pdfUploadInput" accept=".pdf" />
+            </div>
+            <div id="uploadStatus" class="status-msg"></div>
+        </aside>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
