@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent F - 智能客服指挥台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+</head>
+<body data-state="idle">
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="brand-block">
+                <div class="brand-mark" aria-hidden="true">
+                    <span class="brand-core"></span>
+                    <span class="brand-ring"></span>
+                </div>
+                <div class="brand-copy">
+                    <span class="eyebrow">EastCloud Service OS</span>
+                    <h1>Agent F</h1>
+                </div>
+                <span class="badge badge-pro">PRO</span>
+            </div>
+
+            <div class="sidebar-summary">
+                <div class="summary-item">
+                    <span class="summary-label">今日节省工时</span>
+                    <strong class="summary-value">12.4h</strong>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">AI 采纳率</span>
+                    <strong class="summary-value">98.2%</strong>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#" class="active">
+                    <span class="nav-index">01</span>
+                    <span class="nav-copy">
+                        <strong>收件箱</strong>
+                        <small>1 条高优先级待处理消息</small>
+                    </span>
+                </a>
+                <a href="#">
+                    <span class="nav-index">02</span>
+                    <span class="nav-copy">
+                        <strong>风险工单</strong>
+                        <small>聚焦高情绪、高赔付、高时效场景</small>
+                    </span>
+                </a>
+                <a href="#">
+                    <span class="nav-index">03</span>
+                    <span class="nav-copy">
+                        <strong>自动策略</strong>
+                        <small>联动 SOP、PII 清洗与合规拦截</small>
+                    </span>
+                </a>
+                <a href="#">
+                    <span class="nav-index">04</span>
+                    <span class="nav-copy">
+                        <strong>数据观察</strong>
+                        <small>查看消息吞吐、意图分布与命中率</small>
+                    </span>
+                </a>
+            </nav>
+
+            <div class="sidebar-action">
+                <p class="action-caption">演示入口</p>
+                <button id="btnMockMessage" class="btn-primary">模拟接收 Amazon SP-API 客诉</button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <header class="workspace-header">
+                <div class="workspace-title">
+                    <span class="eyebrow">Operational cockpit</span>
+                    <h2>订单流转中心</h2>
+                    <p>围绕订单上下文、情绪分析、知识召回与合规回复，形成一条清晰的处理链。</p>
+                </div>
+
+                <div class="workspace-meta">
+                    <div class="meta-chip">
+                        <span class="meta-label">队列状态</span>
+                        <strong id="queueStatusText">空闲待命</strong>
+                    </div>
+                    <div class="meta-chip">
+                        <span class="meta-label">本地时间</span>
+                        <strong id="systemClock">--:--</strong>
+                    </div>
+                </div>
+            </header>
+
+            <section class="signal-band" aria-label="系统状态总览">
+                <div class="signal-item">
+                    <span class="signal-label">接入通道</span>
+                    <strong>Amazon Buyer-Seller Messaging</strong>
+                </div>
+                <div class="signal-item">
+                    <span class="signal-label">知识底座</span>
+                    <strong>RAG / 企业售后 SOP / 话术库</strong>
+                </div>
+                <div class="signal-item">
+                    <span class="signal-label">自动保护</span>
+                    <strong>PII 清洗 + 合规扫描已启用</strong>
+                </div>
+            </section>
+
+            <section class="workstage box-surface" id="chatContainer" data-state="idle">
+                <div id="orderContextBar" class="order-context-bar" style="display: none;">
+                    <div class="context-mark" aria-hidden="true">
+                        <span class="context-core"></span>
+                        <span class="context-wave"></span>
+                    </div>
+                    <div class="order-details">
+                        <span class="section-label">当前订单</span>
+                        <strong id="currentOrderInfo">订单号</strong>
+                        <span class="product-name">Bose QuietComfort 45 蓝牙降噪耳机 · 黑色 · ASIN B098FH5P3C</span>
+                    </div>
+                    <div class="order-tags">
+                        <span class="badge badge-blue">Prime 配送</span>
+                        <span class="badge badge-neutral">签收 3 天前</span>
+                        <span class="badge badge-alert">投诉升级中</span>
+                    </div>
+                </div>
+
+                <div id="chatHistory" class="chat-history">
+                    <div class="placeholder-msg">
+                        <span class="placeholder-kicker">Awaiting event</span>
+                        <strong>工作台正处于待命状态</strong>
+                        <p>点击左下角演示按钮，查看消息接入、分析和回复生成的完整流程。</p>
+                    </div>
+                </div>
+            </section>
+
+            <div id="aiPipeline" class="ai-pipeline" style="display: none;">
+                <div class="step step-1">
+                    <span class="step-index">01</span>
+                    <div class="step-copy">
+                        <strong>情绪与意图识别</strong>
+                        <span>识别投诉等级与处理目标</span>
+                    </div>
+                </div>
+                <div class="step step-2">
+                    <span class="step-index">02</span>
+                    <div class="step-copy">
+                        <strong>RAG 知识召回</strong>
+                        <span>匹配政策、维修与售后规则</span>
+                    </div>
+                </div>
+                <div class="step step-3">
+                    <span class="step-index">03</span>
+                    <div class="step-copy">
+                        <strong>回复草稿生成</strong>
+                        <span>组织结构、语气与解决方案</span>
+                    </div>
+                </div>
+                <div class="step step-4">
+                    <span class="step-index">04</span>
+                    <div class="step-copy">
+                        <strong>合规与脱敏校验</strong>
+                        <span>过滤风险表达与敏感信息</span>
+                    </div>
+                </div>
+            </div>
+
+            <section class="reply-box box-surface" id="replyBox" style="display: none;">
+                <div class="reply-header">
+                    <div class="ai-insight-tags">
+                        <span class="badge badge-alert">高风险客诉</span>
+                        <span class="badge badge-purple">意图：<span id="replyIntent">--</span></span>
+                        <span class="badge badge-green">合规扫描通过</span>
+                    </div>
+                    <div class="confidence">AI 置信度 <span>99.2%</span></div>
+                </div>
+
+                <label class="composer-label" for="aiDraftInput">AI 建议回复</label>
+                <textarea id="aiDraftInput" rows="6" placeholder="AI 生成的回复将显示在这里"></textarea>
+
+                <div class="reply-actions">
+                    <button class="btn-secondary" type="button">切换为更克制语气</button>
+                    <button id="btnSendReply" class="btn-primary" type="button">发送并完成工单</button>
+                </div>
+            </section>
+        </main>
+
+        <aside class="right-panel">
+            <div class="panel-header">
+                <span class="eyebrow">Knowledge engine</span>
+                <h3>企业私域知识引擎</h3>
+                <p>把政策、质检规则和经验话术压缩进同一套检索上下文。</p>
+            </div>
+
+            <div class="search-box">
+                <input type="text" placeholder="检索 SOP / 售后政策 / 话术库" />
+            </div>
+
+            <div class="kb-section">
+                <h4>当前在线知识源</h4>
+                <ul class="kb-list pre-populated">
+                    <li>
+                        <div class="kb-icon">PDF</div>
+                        <div class="kb-info">
+                            <strong>Global_Return_Policy_v2.pdf</strong>
+                            <span>30.2 MB · 已向量化 1,024 chunks</span>
+                        </div>
+                        <span class="status-dot green"></span>
+                    </li>
+                    <li>
+                        <div class="kb-icon">DOC</div>
+                        <div class="kb-info">
+                            <strong>Bose_Troubleshooting.docx</strong>
+                            <span>2.1 MB · 已向量化 312 chunks</span>
+                        </div>
+                        <span class="status-dot green"></span>
+                    </li>
+                    <li>
+                        <div class="kb-icon">CSV</div>
+                        <div class="kb-info">
+                            <strong>话术与合规红线词库.csv</strong>
+                            <span>150 KB · 热加载中，供实时策略命中</span>
+                        </div>
+                        <span class="status-dot green"></span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="upload-area">
+                <p>拖拽新的 PDF 注入 AI 检索层</p>
+                <small>支持 OCR、拆块与语义向量化</small>
+                <input type="file" id="pdfUploadInput" accept=".pdf" />
+            </div>
+            <div id="uploadStatus" class="status-msg"></div>
+        </aside>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
